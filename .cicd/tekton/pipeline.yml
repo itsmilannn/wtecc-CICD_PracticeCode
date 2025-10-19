@@ -1,0 +1,32 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: python-ci-cd-pipeline
+spec:
+  resources:
+    - name: git-source
+      type: git
+    - name: docker-image
+      type: image
+  tasks:
+    - name: lint
+      taskRef:
+        name: lint
+    - name: test
+      runAfter:
+        - lint
+      taskRef:
+        name: test
+    - name: build
+      runAfter:
+        - test
+      taskRef:
+        name: build-docker
+      params:
+        - name: IMAGE
+          value: "$(resources.outputs.docker-image.url)"
+    - name: deploy
+      runAfter:
+        - build
+      taskRef:
+        name: deploy

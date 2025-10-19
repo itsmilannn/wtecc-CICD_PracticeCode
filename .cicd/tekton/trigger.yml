@@ -1,0 +1,52 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerBinding
+metadata:
+  name: github-pr-binding
+spec:
+  params:
+    - name: gitrevision
+      value: $(body.pull_request.head.sha)
+    - name: gitrepositoryurl
+      value: $(body.repository.clone_url)
+---
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: github-pr-template
+spec:
+  params:
+    - name: gitrevision
+    - name: gitrepositoryurl
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1beta1
+      kind: PipelineRun
+      metadata:
+        generateName: python-ci-cd-run-
+      spec:
+        pipelineRef:
+          name: python-ci-cd-pipeline
+        resources:
+          - name: git-source
+            resourceSpec:
+              type: git
+              params:
+                - name: url
+                  value: $(params.gitrepositoryurl)
+                - name: revision
+                  value: $(params.gitrevision)
+          - name: docker-image
+            resourceRef:
+              name: docker-image
+---
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: github-pr-listener
+spec:
+  serviceAccountName: tekton-triggers-sa
+  triggers:
+    - name: github-pr-trigger
+      bindings:
+        - ref: github-pr-binding
+      template:
+        ref: github-pr-template

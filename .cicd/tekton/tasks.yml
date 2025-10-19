@@ -1,0 +1,62 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: lint
+spec:
+  steps:
+    - name: flake8-lint
+      image: python:3.10-slim
+      workingDir: /workspace/source
+      script: |
+        #!/usr/bin/env bash
+        pip install flake8
+        echo "Running lint..."
+        flake8 .
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: test
+spec:
+  steps:
+    - name: pytest
+      image: python:3.10-slim
+      workingDir: /workspace/source
+      script: |
+        #!/usr/bin/env bash
+        pip install -r requirements.txt
+        pip install pytest
+        pytest -q
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: build-docker
+spec:
+  params:
+    - name: IMAGE
+      type: string
+  steps:
+    - name: build-image
+      image: gcr.io/kaniko-project/executor:latest
+      workingDir: /workspace/source
+      args:
+        - "--destination=$(params.IMAGE)"
+        - "--context=."
+        - "--dockerfile=Dockerfile"
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: deploy
+spec:
+  steps:
+    - name: deploy-to-k8s
+      image: bitnami/kubectl:latest
+      workingDir: /workspace/source
+      script: |
+        #!/usr/bin/env bash
+        echo "Deploying to Kubernetes..."
+        kubectl apply -f k8s/pvc.yaml
+        kubectl apply -f k8s/deployment.yaml
+        kubectl apply -f k8s/service.yaml
